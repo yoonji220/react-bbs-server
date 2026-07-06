@@ -7,6 +7,8 @@ const multer = require("multer");
 
 app.use(express.json()); //json->object
 app.use(express.urlencoded({ extended: true })); //html form ->object
+app.use("/uploads", express.static("uploads"));
+// /uploads 주소로 접속시 upload 폴더에 점근 권한 부여
 
 let corsOptions = {
   origin: "*",
@@ -55,7 +57,7 @@ app.get("/view", (req, res) => {
   const id = req.query.id;
   // const sqlQuery = `SELECT * FROM board WHERE id=${req.query.id};`;
   const sqlQuery =
-    "SELECT title, content, writer, DATE_FORMAT(date, '%Y-%m-%d') AS date FROM board WHERE id=?;";
+    "SELECT title, content, writer, image_path, DATE_FORMAT(date, '%Y-%m-%d') AS date FROM board WHERE id=?;";
   db.query(sqlQuery, [id], (err, result) => {
     if (err) throw err;
     res.send(result);
@@ -95,12 +97,35 @@ app.post("/deleteselect", (req, res) => {
   });
 });
 
-app.post("/update", (req, res) => {
+app.post("/update", upload.single("image"), (req, res) => {
   console.log(req.body);
-  const { name, title, content, id } = req.body;
+  const { writer, title, content, id, remove_image } = req.body;
+  const imagePath = req.file ? req.file.path : null; // 새 이미지 정보 할당
+  const shouldRemoveImage = remove_image === "1";
 
-  const sqlQuery = "UPDATE board SET writer=?, title=?, content=? WHERE id=?";
-  db.query(sqlQuery, [name, title, content, id], (err, result) => {
+  let sqlQuery;
+  let params;
+
+  // 상황별 sqlQuery params 정의
+  if (shouldRemoveImage && !imagePath) {
+    // 이미지 삭제 요청 o + 새 이미지x -> 기존 이미지 제거, image_path 값 비우기
+    sqlQuery =
+      "UPDATE board SET writer=?, title=?, content=?, image_path=NULL WHERE id=?";
+    params = [writer, title, content, id];
+  } else if (imagePath) {
+    // 이미지 삭제 요청 X + 새 이미지 o -> 기존이미지 유지, image_path 새 이미지 업데이트
+    sqlQuery =
+      "UPDATE board SET writer=?, title=?, content=?, image_path=? WHERE id=?";
+    params = [writer, title, content, imagePath, id];
+  } else {
+    // 이미지 삭제 요청 X + 새 이미지 X -> 이미지 유지, 글 정보만 변경
+    sqlQuery = "UPDATE board SET writer=?, title=?, content=? WHERE id=?";
+    params = [writer, title, content, id];
+  }
+
+  // const sqlQuery = "UPDATE board SET writer=?, title=?, content=? WHERE id=?";
+
+  db.query(sqlQuery, params, (err, result) => {
     if (err) throw err;
     res.send(result);
   });
