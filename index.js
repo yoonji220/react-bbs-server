@@ -4,6 +4,8 @@ const app = express();
 const mysql = require("mysql2");
 const port = 3000;
 const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 app.use(express.json()); //json->object
 app.use(express.urlencoded({ extended: true })); //html form ->object
@@ -38,6 +40,15 @@ const db = mysql.createConnection({
 });
 
 db.connect();
+
+function deleteUploadedFile(filePath) {
+  if (!filePath) return;
+  const absolutePath = path.resolve(filePath); // 삭제할 파일의 절대 경로 확인
+  if (fs.existsSync(absolutePath)) {
+    // 해당 파일이 실제 서버에 있는지 확인
+    fs.unlinkSync(absolutePath);
+  }
+}
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -80,6 +91,13 @@ app.post("/delete", (req, res) => {
   console.log(req.body);
   const { id } = req.body;
 
+  // 글 번호 삭제할 이미지의 경로 파악
+  db.query("SELECT image_path FROM board WHERE id=?", [id], (err, result) => {
+    if (err) throw err;
+    const existingImagePath = result[0] ? result[0].image_path : null;
+    deleteUploadedFile(existingImagePath);
+  });
+
   const sqlQuery = "DELETE FROM board WHERE id=?";
   db.query(sqlQuery, [id], (err, result) => {
     if (err) throw err;
@@ -109,6 +127,8 @@ app.post("/update", upload.single("image"), (req, res) => {
   // 상황별 sqlQuery params 정의
   if (shouldRemoveImage && !imagePath) {
     // 이미지 삭제 요청 o + 새 이미지x -> 기존 이미지 제거, image_path 값 비우기
+    // 서버에서 기존 이미지 삭제
+
     sqlQuery =
       "UPDATE board SET writer=?, title=?, content=?, image_path=NULL WHERE id=?";
     params = [writer, title, content, id];
