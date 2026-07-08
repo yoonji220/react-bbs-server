@@ -2,15 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const mysql = require("mysql2");
-const port = 3000;
+const port = process.env.PORT || 3000;
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 
 app.use(express.json()); //json->object
 app.use(express.urlencoded({ extended: true })); //html form ->object
-app.use("/uploads", express.static("uploads"));
-// /uploads 주소로 접속시 upload 폴더에 점근 권한 부여
+// app.use("/uploads", express.static("uploads")); // 상대경로 .// /uploads 주소로 접속시 upload 폴더에 점근 권한 부여
+app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // /uploads  절대경로 upload 폴더에 접근 권한 부여
 
 let corsOptions = {
   origin: "*",
@@ -20,7 +20,8 @@ app.use(cors(corsOptions));
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/");
+    // cb(null, "uploads/");
+        cb(null, path.join(__dirname, "uploads"));
   },
   filename: function (req, file, cb) {
     // console.log(file);
@@ -124,7 +125,7 @@ app.post("/deleteselect", (req, res) => {
   );
 
   // DB 테이블에서 글 여러개 삭제
-  const sqlQuery = `delete from board where id in (${boardIdList})`;
+  const sqlQuery = `delete from    board where id in (${boardIdList})`;
   db.query(sqlQuery, (err, result) => {
     if (err) throw err;
     res.send(result);
